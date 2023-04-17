@@ -20,7 +20,6 @@ LASR is based on python and pytorch, but we recommend the below configuration fo
 If all recommended configurations are satisfied, LASR can be directly used by only adding it to the `PYTHONPATH` environment variable.
 ```
 export PYTHONPATH=/path/to/lasrfolder/:$PYTHONPATH
-
 ```
 ### Install from source
 ```
