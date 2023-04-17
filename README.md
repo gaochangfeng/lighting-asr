@@ -1,26 +1,38 @@
 # LASR: a lighting ASR model training platform
 We believe the existing ASR training is too complex, so we want to design a ASR training platform as lighting as possible. 
 With LASR, you can train your asr model by only providing the wav list and text list. 
-All of the training deetails can be modified in the `config.yaml`.
+All of the training details can be modified in the `config.yaml`.
 You can also train your own torch model by warp it with the LASR interface. 
 
 ## The Recommended Configuration
 LASR is based on python and pytorch, but we recommend the below configuration for use.
 - Python3.7+  
 - PyTorch 1.8.1+
+- [torchaudio](https://pytorch.org/)
 - editdistance (eval the ASR results, install with pip)
 - soundfile (if you want to read raw wav file or flac file, install with pip)
 - librosa (if you want to read raw wav file or flac file, install with pip)
 - jiwer (if you want to evaluate the asr results in python)
-- [torchaudio](https://pytorch.org/) (to extract the speech feathers online)
 - [pytorch lightning](https://lightning.ai/docs/pytorch/stable/) (We recommand to use lighting to train the asr model, but you can also train the ASR model by yourself)
 
 ## Install Guideline
-
-If all recommended configurations are satisfied, ETEH can be directly used by only adding it to the `PYTHONPATH` environment variable.
+### Without install
+If all recommended configurations are satisfied, LASR can be directly used by only adding it to the `PYTHONPATH` environment variable.
 ```
 export PYTHONPATH=/path/to/lasrfolder/:$PYTHONPATH
+
 ```
+### Install from source
+```
+git clone https://github.com/gaochangfeng/lighting-asr.git
+cd lighting-asr
+python setup.py install
+```
+### Install by pip
+```
+pip install git+https://github.com/gaochangfeng/lighting-asr.git
+```
+
 ## Use Guideline
 ### Prepare the training data
 We use the Kaldi style scp file as input, `wav.scp` and `text` are needed. (the blank symbol is space)
@@ -51,7 +63,7 @@ You can use the `bin/train_lighting.py` for training.
 ### Decoding 
 For decoding, you can define the some parameters in the `decode.yaml`.
 
-You can use the `bin/decode_lighting.py` to evaluate your model for evaluation. But if you only want to recognize some audio, you can just use the `lasr.process.asrprocess.ASRProcess` as follow:
+You can use the `bin/decode_lighting.py` to evaluate your model on the test dataset. But if you only want to recognize some audio, you can just use the `lasr.process.asrprocess.ASRProcess` as follow:
 ```
 from lasr.process.asrprocess import ASRProcess
 
@@ -64,7 +76,10 @@ asrpipeline = ASRProcess(
     model_path=model_path
 )
 token, text = asrpipeline("test.wav")
-print(token_1)
-print(text_1)
+print(token)
+print(text)
 
 ```
+## Open Source Model
+### [lighting-asr-zh-cn](https://huggingface.co/GCFzz/lighting-asr-zh-cn)
+ASR Models train with AISHELL-1/AISHELL-2/CommonVoice v12.0-zh
