@@ -1,0 +1,20 @@
+decode_config:
+  decode_method: ctc_att
+  beam: 10
+  ctc_beam: 15
+  lm_path: 
+  lm_rate: 0.3
+  ctc_weight: 0.5
+
+test_data_config:
+  name: 'lasr.data.dataset:AudioDataSet'
+  kwargs:
+    wav_list: "/mnt/ssd/gaochangfeng/data/AIShell/data/test/wav.scp"
+    text_list: "/mnt/ssd/gaochangfeng/data/AIShell/data/test/text"
+    # dict_path: "/data/gaochangfeng/docker/project_final/env/eteh_light/example/lasr/data/dict_cs.txt"
+    # tokenizer: "char" #分为char, word, toknizer_path三种？
+    audio_trans:
+     - norm
+     - fbank:80
+    pad_audio: 0
+    pad_feats: 0
