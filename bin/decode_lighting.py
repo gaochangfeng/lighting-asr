@@ -134,6 +134,8 @@ def main():
         else:
             hypo = ctc_bs_decode(model, decoder, tokenizer.char_list, args.device, feats)
         ref = batch["text"][0]
+        _, ref_id = tokenizer.encode(ref)
+        _, ref = tokenizer.decode(ref_id, no_special=True)        
         _, hypo = tokenizer.decode(hypo, no_special=True)
         if ref != 'None':
             dist = editdistance.eval(hypo, ref)
@@ -157,12 +159,14 @@ def main():
             ref_list,
             hyp_list,
         )
+        print("====JIWER ALIGN_CER====")
         print(jiwer.visualize_alignment(out))
 
         out = jiwer.process_words(
             ref_list,
             hyp_list,
         )
+        print("====JIWER ALIGN_WER====")
         print(jiwer.visualize_alignment(out))
 
     except ImportError:
