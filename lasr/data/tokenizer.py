@@ -151,7 +151,7 @@ class HuggingTokenizer(BaseTokenizer):
                 while t in token_id:
                     token_id.remove(t)
         token = [self.get_id_token(id) for id in token_id]
-        text = self.tokenizer.decode(token_id).replace(self.sc, "")        
+        text = self.tokenizer.decode(token_id).replace(" " + self.sc, "")        
         return token, text
 
     @staticmethod
