@@ -98,7 +98,7 @@ class AudioDataSet(torch.utils.data.Dataset):
                     {
                         "id": id,
                         "wav": wav_path,
-                        "text": text_line,
+                        "text": text_line.upper(),
                         "feats": "None"                    
                     }
                 )
@@ -130,6 +130,7 @@ class AudioDataSet(torch.utils.data.Dataset):
                 item["token_len"] = len(item["token_id"] )
             else:
                 item["token_id"], item["token_len"] = numpy.array([0]), 0
+
 
     def example_data(self):
         return {
@@ -233,13 +234,16 @@ class AudioDataSet(torch.utils.data.Dataset):
 class BatchAudioDataSet(AudioDataSet):
     def __init__(
             self, wav_list=None, text_list=None, feats_list=None, tokenizer="char", audio_trans=["fbank80"], feats_trans=None, pad_audio=0, pad_feats=0,
+            batch_sort = True,
             batch_size = 32,
             batch_duration = 320,
             batch_bin = 32 * 500 * 80,
             batch_type = "size",
             max_duration = 30,
             min_duration = 0.3,
-            text_freq = 0.08
+            text_freq = 0.08,
+            min_token = 0,
+            max_token = 5000
         ):
         super().__init__(wav_list, text_list, feats_list, tokenizer, audio_trans, feats_trans, pad_audio, pad_feats)
         self.batch_type = batch_type
@@ -249,15 +253,26 @@ class BatchAudioDataSet(AudioDataSet):
         self.max_duration = max_duration
         self.min_duration = min_duration
         self.text_freq = text_freq
+        self.min_token = min_token
+        self.max_token = max_token
+        self.batch_sort = batch_sort
 
     def check_dataset(self):
         super().check_dataset()
-        self.train_set.sort(key=lambda x: x["wav_len"] * 16000 + x["token_len"])
+        import random
+        random.shuffle(self.train_set) #sort是稳定排序，这样可以避免一个batch里的数据来源于一个数据集
+        if self.batch_sort:
+            self.train_set.sort(key=lambda x: x["wav_len"] * 16000 + x["token_len"])
         before_filter = len(self.train_set)
         self.train_set = list(
             filter(
                 # lambda x: x["wav_len"]<self.min_duration or x["wav_len"]>self.max_duration or x["wav_len"]/x["token_len"] < self.text_freq,
-                lambda x: x["wav_len"]<self.max_duration and x["wav_len"]>self.min_duration and x["wav_len"]/x["token_len"] > self.text_freq,
+                lambda x: 
+                    x["wav_len"]<=self.max_duration and 
+                    x["wav_len"]>=self.min_duration and
+                    x["token_len"]>=self.min_token and 
+                    x["token_len"]<=self.max_token and 
+                    x["wav_len"]/(x["token_len"]+0.1) > self.text_freq,
                 self.train_set        
             )
         )
