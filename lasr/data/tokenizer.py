@@ -10,6 +10,11 @@ try:
 except ImportError:
         logging.warning("tokenizers is not installed, some function could be banned")
 
+try:
+    import sentencepiece as spm
+except ImportError:
+        logging.warning("sentencepiece is not installed, some function could be banned")
+
 class BaseTokenizer(object):
     ID_VALUE_BLACK = 0
     ID_VALUE_SOS = 1
@@ -161,3 +166,57 @@ class HuggingTokenizer(BaseTokenizer):
         trainer = WordPieceTrainer(special_tokens=BaseTokenizer.SPECIAL_KEY, vocab_size=vocab_size)
         tokenizer.train(files=train_file, trainer=trainer)
         tokenizer.save(save_path, pretty=True)
+
+class SPMTokenizer(BaseTokenizer):
+    def __init__(self, dict_path, sc='▁'):
+        super().__init__()
+        self.tokenizer = spm.SentencePieceProcessor(model_file=dict_path)
+        self.char_dict = {}
+        self.char_list = [i for i in range(self.tokenizer.vocab_size())]
+        for k in [self.tokenizer.bos_id(), self.tokenizer.eos_id(),self.tokenizer.unk_id(),self.tokenizer.pad_id()]:
+            if k in self.char_list:
+                self.char_list.remove(k) 
+        self.char_list = BaseTokenizer.SPECIAL_KEY + [self.tokenizer.id_to_piece(i) for i in self.char_list]
+
+        for i,c in enumerate(self.char_list):
+            self.char_dict[c] = i
+        self.sc = sc
+
+    def get_token_id(self, token):
+        token = token.upper()
+        if token in self.char_dict:
+            return self.char_dict[token]
+        else:
+            return self.char_dict[self.ID_KEY_UNK]
+
+    def get_id_token(self, id):
+        if id > len(self.char_list):
+            return self.ID_KEY_UNK
+        else:
+            return self.char_list[id]
+
+    def dict_size(self):
+        return len(self.char_list)
+
+    def encode(self, text, add_sos_eos=True):
+        text = text.upper()
+        token = self.tokenizer.encode(text, out_type=str)
+        token_id = [self.get_token_id(c) for c in token]
+        if add_sos_eos:
+            token = [self.ID_KEY_SOS] + token + [self.ID_KEY_EOS]
+            token_id = [self.ID_VALUE_SOS] + token_id + [self.ID_VALUE_SOS]
+        return token, token_id
+
+    def decode(self, token_id, no_special=False):
+        if no_special:
+            for t in self.SPECIAL_VALUE:
+                while t in token_id:
+                    token_id.remove(t)
+        token = [self.get_id_token(id) for id in token_id]
+        text = ''.join([x.replace(self.sc, " ") for x in token])
+        return token, text
+    
+    @staticmethod
+    def train_tokenizer(train_file, save_path, vocab_size=5000):
+        train_cmd = '--input={} --model_prefix={} --vocab_size={}'.format(train_file, save_path, vocab_size)
+        spm.SentencePieceTrainer.train(train_cmd)
