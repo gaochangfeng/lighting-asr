@@ -58,7 +58,7 @@ def main():
         print("Decoding with the averged model:" + args.model_path)
     else:
         state_dict, choose = model_average(args.model_path, ids = args.choose, num = args.avg)
-        torch.save({'state_dict':state_dict}, args.model_path + '/average_{}_{}.ckpt'.format(args.choose, args.avg))
+        torch.save({'state_dict':state_dict}, args.model_path + '/average_{}_{}.pt'.format(args.choose, args.avg))
         print("Decoding with the averged model from:")
         print(choose)
     state_dict = {k.split('.', maxsplit=1)[1]: v for k, v in state_dict.items()}
@@ -144,8 +144,8 @@ def main():
         print('ref:', ref)
         print('hyp:', hypo)
         print('dis:', dist)
-        ref_list.append(ref)
-        hyp_list.append(hypo)
+        ref_list.append(ref + ' <\s>')
+        hyp_list.append(hypo + ' <\s>')
 
         error += dist
         token_num += len(ref)
