@@ -1,0 +1,87 @@
+model_config:
+    name: 'lasr.model.e2e_ctc_att.e2e_conformer:E2E_Conformer_CTC'
+    kwargs:
+      idim: 80
+      odim: 0 # training_lighting.py will dymatic change it according to the tokenizer
+      encoder_attention_dim: 320
+      encoder_attention_heads: 8
+      encoder_linear_units: 2048
+      encoder_num_blocks: 12
+      encoder_input_layer: conv2d
+      encoder_dropout_rate: 0.1
+      encoder_attention_dropout_rate: 0
+      decoder_attention_dim: 320
+      decoder_attention_heads: 8
+      decoder_linear_units: 2048
+      decoder_input_layer: embed
+      decoder_num_block: 6
+      decoder_dropout_rate: 0.1
+      decoder_src_attention_dropout_rate: 0
+      decoder_self_attention_dropout_rate: 0
+      ctc_dropout: 0.1
+      encoder_pos_enc_layer_type: "rel_pos"
+      encoder_selfattention_layer_type: "rel_selfattn"
+
+opti_config:
+    name: 'torch.optim:Adam'
+    kwargs:
+      betas: 
+        - 0.9
+        - 0.98
+    scheduler:
+      name: 'lasr.modules.optimizer.scheduler:WarmupScheduler'
+      kwargs:
+        factor: 3
+        warm_step: 25000
+        model_size: 320
+        offset: 0
+
+    
+criterion_config:
+    name: 'lasr.model.e2e_ctc_att.e2e_loss:E2E_Loss'
+    kwargs:
+      size: 0 # training_lighting,py will dymatic change it according to the tokenizer
+      padding_idx: -1
+      smoothing: 0.1
+      rate: 0.3    
+
+tokenizer_config:
+    name: 'lasr.data.tokenizer:HuggingTokenizer' # Need 
+    kwargs:
+      dict_path: "data/tokenizer.json"
+      sc: "##"
+      
+# tokenizer_config:
+    # name: 'lasr.data.tokenizer:SPMTokenizer'
+    # kwargs:
+      # dict_path: "data/train_unigram5000.model"
+
+train_data_config:
+  name: 'lasr.data.dataset:BatchAudioDataSet' # this dataset can make batch according to the length of the audio
+  kwargs:
+    wav_list: 
+      - "data/train/wav.scp"
+    text_list: 
+      - "data/train/text"
+    audio_trans: # See the lasr.data.datatrans
+     - norm
+     - fbank:80
+     - specaug
+    pad_audio: 0
+    pad_feats: 0
+    batch_duration: 500
+    batch_type: duration
+
+valid_data_config:
+  name: 'lasr.data.dataset:BatchAudioDataSet'
+  kwargs:
+    wav_list: 
+     - "data/dev/wav.scp"
+    text_list: 
+     - "data/dev/text"
+    audio_trans:
+     - norm
+     - fbank:80
+    pad_audio: 0
+    pad_feats: 0
+    batch_duration: 200
