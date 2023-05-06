@@ -3,7 +3,7 @@ export PYTHONPATH=$PLAT_ROOT:$PYTHONPATH
 export OMP_NUM_THREADS=1
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5
 
-tag=ls_swbd_cmv_ami_chime
+tag=baseline
 
 mkdir -p exp/train_${tag}
 cp conf/config_${tag}.yaml exp/train_${tag}
