@@ -144,8 +144,11 @@ def main():
         print('ref:', ref)
         print('hyp:', hypo)
         print('dis:', dist)
-        ref_list.append(ref + ' <\s>')
-        hyp_list.append(hypo + ' <\s>')
+        if len(ref) == 0:
+            ref += '#'
+            hypo += '#'
+        ref_list.append(ref)
+        hyp_list.append(hypo)
 
         error += dist
         token_num += len(ref)
