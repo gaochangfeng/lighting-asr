@@ -123,6 +123,10 @@ def main():
                     metavar='N', help='number of gpu to use, -1 means cpu, 0 means no paraller')
     parser.add_argument('-num_epochs', default=50, type=int,
                     metavar='N', help='train_epochs')
+    parser.add_argument('-fp16', default=32, type=int,
+                    metavar='N', help='train with fp16')
+    parser.add_argument('-acc_grads', default=1, type=int,
+                    metavar='N', help='parameters of the accumulate_grad_batches')
     parser.add_argument('-resume_ckpt', default=None, type=str,
                     help='resume the training ckpt')    
 
@@ -142,10 +146,13 @@ def main():
     train_dataset = BaseConfig(**train_data_config).generateExample(tokenizer=tokenizer)
     valid_dataset = BaseConfig(**valid_data_config).generateExample(tokenizer=tokenizer)
 
-    output_dim = tokenizer.dict_size()
-    model_config["kwargs"]["odim"] = output_dim
-    criterion_config["kwargs"]["size"] = output_dim
-    criterion_config["kwargs"]["padding_idx"] = tokenizer.ID_VALUE_IGNORE
+    if "odim" in model_config["kwargs"]:
+        output_dim = tokenizer.dict_size()
+        model_config["kwargs"]["odim"] = output_dim
+    if "size" in criterion_config["kwargs"]:
+        criterion_config["kwargs"]["size"] = output_dim
+    if "padding_idx" in criterion_config["kwargs"]:
+        criterion_config["kwargs"]["padding_idx"] = tokenizer.ID_VALUE_IGNORE
 
 
     model = BaseConfig(**model_config).generateExample()
@@ -173,7 +180,7 @@ def main():
     trainer = pl.Trainer(
         default_root_dir=args.exp_dir,
         max_epochs=args.num_epochs, min_epochs=1, #同理还有step和time
-        accumulate_grad_batches=1, gradient_clip_val=5, #梯度裁剪和梯度平均
+        accumulate_grad_batches=args.acc_grads, gradient_clip_val=5, #梯度裁剪和梯度平均
         benchmark=None, # True for fixed input size
         callbacks=lmodel.get_callbacks(), #靠回调函数来进行各种增强功能
         check_val_every_n_epoch=1, #CheckPoint参数
@@ -187,7 +194,7 @@ def main():
         devices=args.num_gpu, # 5
         sync_batchnorm=False,
         use_distributed_sampler=True, #是否自动添加分布式训练采样，False则需要自己写分布式采样的方式
-        precision=32, #训练精度
+        precision=args.fp16, #训练精度
         enable_progress_bar=True, #进度条
         logger=True, #自定义Logger，True为TensorBoard，可以修改为其他的自定义的
         inference_mode=False, #相当于no_grad
