@@ -170,3 +170,45 @@ class Conv2dSubsampling8(torch.nn.Module):
         if x_mask is None:
             return x, None
         return x, x_mask[:, :, :-2:2][:, :, :-2:2][:, :, :-2:2]
+
+
+class Conv2dUpsampling(torch.nn.Module):
+    def __init__(self, idim, odim, dropout_rate, pos_enc=None):
+        """Construct an Conv2dUpsampling object. 
+            When the parameters of the Conv2dUpsampling and Conv2dDownsampling are same,
+            the output will has same shape with the input, expect the T dim.
+        
+        """
+        super(Conv2dUpsampling, self).__init__()            
+   
+        self.odim = odim
+        self.idim = idim
+        self.middle_dim = ((idim - 1) // 2 - 1) // 2
+        
+        self.input = torch.nn.Sequential(
+            torch.nn.Linear(odim, odim * self.middle_dim),
+        )
+        
+        if idim % 4 ==0:
+            p1, p2, o1, o2 = 0, 0, 0, 1 #pad 1 for D dim
+        elif idim % 4 == 1:
+            p1, p2, o1, o2 = 0, 0, 1, 0 #pad 2 for D dim
+        elif idim % 4 == 2:
+            p1, p2, o1, o2 = 0, 0, 1, 1 #pad 3 for D dim
+        else:
+            p1, p2, o1, o2 = 0, 0, 0, 0 #pad 0 for D dim
+        
+        self.conv = torch.nn.Sequential(
+            torch.nn.ReLU(),
+            torch.nn.ConvTranspose2d(odim, odim, 3, 2, padding=0, output_padding=[0, o1]),
+            torch.nn.ReLU(),
+            torch.nn.ConvTranspose2d(odim, 1, 3, 2, padding=0, output_padding=[0, o2]),
+        )     
+        
+    def forward(self, x, offset=0):
+        x = self.input(x)
+        b, t, c_f = x.size()
+        c, f = self.odim, self.middle_dim
+        x = x.view(b, t, c, f).transpose(1,2).contiguous()
+        x = self.conv(x).squeeze(1)
+        return x
