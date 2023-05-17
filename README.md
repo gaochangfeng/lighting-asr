@@ -82,3 +82,6 @@ print(text)
 ## Open Source Model
 ### [lighting-asr-zh-cn](https://huggingface.co/GCFzz/lighting-asr-zh-cn)
 ASR Models train with AISHELL-1/AISHELL-2/CommonVoice v12.0-zh
+
+### [lighting-asr-en](https://huggingface.co/GCFzz/lighting-asr-en)
+ASR Models train with Librispeech/SwitchBoard/Common Voice
