@@ -8,6 +8,7 @@ import lightning.pytorch as pl
 from lightning.pytorch.callbacks import ModelCheckpoint, Callback
 from lasr.utils.generater import BaseConfig
 from lasr.utils.data_utils import get_s2s_inout
+from lasr.modules.ema.ema import LitEma, ema_scope
 
 class LightModelFace(pl.LightningModule):
     def __init__(
@@ -20,7 +21,8 @@ class LightModelFace(pl.LightningModule):
             model_config=None, 
             criterion_config=None, 
             optim_config=None,
-            tokenizer_config=None
+            tokenizer_config=None,
+            use_ema = False,
         ):
         super().__init__()
         self.model = model
@@ -33,6 +35,10 @@ class LightModelFace(pl.LightningModule):
         self.criterion_config = criterion_config
         self.optim_config = optim_config
         self.tokenizer_config = tokenizer_config
+
+        self.use_ema = use_ema
+        if self.use_ema:
+            self.model_ema = LitEma(self.model)
 
         self.save_hyperparameters("model_config", "criterion_config", "optim_config", "tokenizer_config")
 
@@ -48,14 +54,18 @@ class LightModelFace(pl.LightningModule):
         return loss
     
     def validation_step(self, batch, batch_idx):
-        data = self.pack_data(batch)
-        data.update(self.model.valid_forward(data)) 
-        data.update(self.criterion.valid_forward(data)) 
-        # loss = data["loss_main"]
         self.log("global_step", self.global_step, batch_size=1, sync_dist=True)
-        for k, v in data.items():
-            if isinstance(v, (int, float)) or v.numel() == 1:
-                 self.log("valid_" + k, v, batch_size=1, sync_dist=True)
+        with ema_scope(self.model, self.model_ema, self.use_ema):
+            data = self.pack_data(batch)
+            data.update(self.model.valid_forward(data)) 
+            data.update(self.criterion.valid_forward(data)) 
+            for k, v in data.items():
+                if isinstance(v, (int, float)) or v.numel() == 1:
+                    self.log("valid_" + k, v, batch_size=1, sync_dist=True)
+
+    def on_train_batch_end(self, *args, **kwargs):
+        if self.use_ema:
+            self.model_ema(self.model)
 
     def configure_optimizers(self):      
         if self.scheduler is None:  
@@ -68,7 +78,29 @@ class LightModelFace(pl.LightningModule):
                     "interval": "step",
                 }
             }
+               
+    def get_callbacks(self):
         
+        checkpoint_callback_top = ModelCheckpoint(
+            save_top_k=10,
+            monitor="valid_loss_main",
+            mode="min",
+            # dirpath="my/path/",
+            filename="best-val-{valid_loss_main:.6f}-{epoch:02d}",
+            )
+
+        # saves last-K checkpoints based on "global_step" metric
+        # make sure you log it inside your LightningModule
+        checkpoint_callback_last = ModelCheckpoint(
+            save_top_k=10,
+            monitor="global_step",
+            mode="max",
+            # dirpath="my/path/",
+            filename="last-step-{epoch:02d}-{global_step}",
+        )
+
+        return [checkpoint_callback_top, checkpoint_callback_last]
+
     def pack_data(self, data):
         x = data["wav_array"]
         xlen = data["wav_len"]
@@ -92,28 +124,7 @@ class LightModelFace(pl.LightningModule):
             "att_label": ys_out,
             "ctc_label": y,
         }
-        
-    def get_callbacks(self):
-        
-        checkpoint_callback_top = ModelCheckpoint(
-            save_top_k=10,
-            monitor="valid_loss_main",
-            mode="min",
-            # dirpath="my/path/",
-            filename="best-val-{valid_loss_main:.6f}-{epoch:02d}",
-            )
 
-        # saves last-K checkpoints based on "global_step" metric
-        # make sure you log it inside your LightningModule
-        checkpoint_callback_last = ModelCheckpoint(
-            save_top_k=10,
-            monitor="global_step",
-            mode="max",
-            # dirpath="my/path/",
-            filename="last-step-{epoch:02d}-{global_step}",
-        )
-
-        return [checkpoint_callback_top, checkpoint_callback_last]
 
 def main():
     parser = argparse.ArgumentParser()
@@ -125,6 +136,8 @@ def main():
                     metavar='N', help='train_epochs')
     parser.add_argument('-fp16', default=32, type=int,
                     metavar='N', help='train with fp16')
+    parser.add_argument('-ema', default=0, type=int,
+                    metavar='N', help='train with ema, 1 for use ema')
     parser.add_argument('-acc_grads', default=1, type=int,
                     metavar='N', help='parameters of the accumulate_grad_batches')
     parser.add_argument('-resume_ckpt', default=None, type=str,
@@ -162,19 +175,18 @@ def main():
         scheduler = BaseConfig(**opt_config['scheduler']).generateExample(optim)
     else:
         scheduler = None
-
-
     
     lmodel = LightModelFace(
-        model, 
-        criterion, 
-        optim,
-        scheduler, 
-        tokenizer,
-        model_config, 
-        criterion_config, 
-        opt_config,
-        tokenizer_config
+        model = model, 
+        criterion = criterion, 
+        optim = optim,
+        scheduler = scheduler, 
+        tokenizer = tokenizer,
+        model_config = model_config, 
+        criterion_config = criterion_config, 
+        optim_config = opt_config,
+        tokenizer_config = tokenizer_config,
+        use_ema = args.ema == 1
     ) 
 
     trainer = pl.Trainer(
