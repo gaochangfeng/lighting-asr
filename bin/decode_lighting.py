@@ -10,6 +10,7 @@ import os
 from lasr.utils.generater import BaseConfig
 from lasr.utils.average_checkpoints import model_average
 import editdistance
+from lasr.modules.ema.ema import LitEma, ema_scope
 
 def main():
     parser = argparse.ArgumentParser()
@@ -61,18 +62,21 @@ def main():
         torch.save({'state_dict':state_dict}, args.model_path + '/average_{}_{}.pt'.format(args.choose, args.avg))
         print("Decoding with the averged model from:")
         print(choose)
-    state_dict = {k.split('.', maxsplit=1)[1]: v for k, v in state_dict.items()}
-    model.load_state_dict(state_dict)
 
-    # if args.gpu >= 0:
-    #     if torch.cuda.device_count() <= args.gpu:
-    #         print('Error!gpu is not enough')
-    #         exit()
-    #     else:
-    #         device = args.gpu
-            
-    # else:
-    #     device = "cpu" 
+    parameters = {}
+    for k, v in state_dict.items():
+        model_id, p_name  = k.split('.', maxsplit=1)
+        if model_id not in parameters:
+            parameters[model_id] = {}
+        parameters[model_id][p_name]  = v
+    # state_dict = {k.split('.', maxsplit=1)[1]: v for k, v in state_dict.items()}
+    model.load_state_dict(parameters['model'])
+    if 'model_ema' in parameters:
+        print("Find EMA parameters, use EMA to decode")
+        model_ema = LitEma(model)
+        model_ema.load_state_dict(parameters['model_ema'])
+        model_ema.copy_to(model)
+
     model = model.to(args.device)
     print(model)
 
